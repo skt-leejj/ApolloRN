@@ -102,8 +102,11 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.hourLine,
   },
   eventArea: {
-    flex: 1,
-    position: 'relative',
+    position: 'absolute',
+    top: 0,
+    bottom: 0,
+    left: LAYOUT.timeLabelWidth,
+    right: 0,
   },
   columnDivider: {
     position: 'absolute',

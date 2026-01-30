@@ -1,34 +1,19 @@
-import React, {useMemo, useCallback} from 'react';
+import React, {useCallback} from 'react';
 import {View, StyleSheet} from 'react-native';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {COLORS} from '../../utils/colors';
-import {getWeekDays, getThreeDays} from '../../utils/dateUtils';
 import {useCalendarStore} from './hooks/useCalendarStore';
 import {useCalendarEvents} from './hooks/useCalendarEvents';
 import {CalendarHeader} from './CalendarHeader';
 import {BottomBar} from './BottomBar';
 import {MonthView} from './MonthView/MonthView';
-import {TimelineView} from './TimelineView/TimelineView';
+import {TimelinePager} from './TimelineView/TimelinePager';
 
 export function CalendarHomeScreen() {
   const insets = useSafeAreaInsets();
-  const {viewType, selectedDate, setSelectedDate, setViewType} =
+  const {viewType, selectedDate, setSelectedDate, goToTodayTrigger} =
     useCalendarStore();
   const {events} = useCalendarEvents();
-
-  // 뷰 타입에 따른 날짜 배열
-  const days = useMemo(() => {
-    switch (viewType) {
-      case 'week':
-        return getWeekDays(selectedDate);
-      case 'threeDays':
-        return getThreeDays(selectedDate);
-      case 'day':
-        return [selectedDate];
-      default:
-        return [];
-    }
-  }, [viewType, selectedDate]);
 
   const handleDayPress = useCallback(
     (date: Date) => {
@@ -41,47 +26,37 @@ export function CalendarHomeScreen() {
     // TODO: 일정 상세 화면 이동
   }, []);
 
+  const handlePageChanged = useCallback(
+    (date: Date) => {
+      setSelectedDate(date);
+    },
+    [setSelectedDate],
+  );
+
+  const numberOfDays = viewType === 'week' ? 7 : viewType === 'threeDays' ? 3 : 1;
+
   const renderContent = () => {
-    switch (viewType) {
-      case 'month':
-        return (
-          <MonthView
-            selectedDate={selectedDate}
-            events={events}
-            onDayPress={handleDayPress}
-          />
-        );
-      case 'week':
-        return (
-          <TimelineView
-            numberOfDays={7}
-            days={days}
-            events={events}
-            onDayPress={handleDayPress}
-            onEventPress={handleEventPress}
-          />
-        );
-      case 'threeDays':
-        return (
-          <TimelineView
-            numberOfDays={3}
-            days={days}
-            events={events}
-            onDayPress={handleDayPress}
-            onEventPress={handleEventPress}
-          />
-        );
-      case 'day':
-        return (
-          <TimelineView
-            numberOfDays={1}
-            days={days}
-            events={events}
-            onDayPress={handleDayPress}
-            onEventPress={handleEventPress}
-          />
-        );
+    if (viewType === 'month') {
+      return (
+        <MonthView
+          selectedDate={selectedDate}
+          events={events}
+          onDayPress={handleDayPress}
+          goToTodayTrigger={goToTodayTrigger}
+        />
+      );
     }
+    return (
+      <TimelinePager
+        numberOfDays={numberOfDays as 1 | 3 | 7}
+        selectedDate={selectedDate}
+        events={events}
+        onDayPress={handleDayPress}
+        onEventPress={handleEventPress}
+        onPageChanged={handlePageChanged}
+        goToTodayTrigger={goToTodayTrigger}
+      />
+    );
   };
 
   return (

@@ -8,6 +8,7 @@ interface CalendarHomeState {
   events: DailyComponentItem[];
   calendars: CalendarItem[];
   loading: boolean;
+  goToTodayTrigger: number;
 
   setViewType: (type: CalendarViewType) => void;
   setSelectedDate: (date: Date) => void;
@@ -23,10 +24,15 @@ export const useCalendarStore = create<CalendarHomeState>(set => ({
   events: [],
   calendars: [],
   loading: false,
+  goToTodayTrigger: 0,
 
   setViewType: type => set({viewType: type}),
   setSelectedDate: date => set({selectedDate: date}),
-  goToToday: () => set({selectedDate: new Date()}),
+  goToToday: () =>
+    set(state => ({
+      selectedDate: new Date(),
+      goToTodayTrigger: state.goToTodayTrigger + 1,
+    })),
   setEvents: events => set({events}),
   setCalendars: calendars => set({calendars}),
   setLoading: loading => set({loading}),

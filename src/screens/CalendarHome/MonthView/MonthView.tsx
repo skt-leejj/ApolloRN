@@ -1,4 +1,4 @@
-import React, {useMemo, useRef, useCallback, useEffect} from 'react';
+import React, {useState, useRef, useCallback, useEffect} from 'react';
 import {View, Text, FlatList, StyleSheet} from 'react-native';
 import {COLORS} from '../../../utils/colors';
 import type {DailyComponentItem} from '../../../types/calendar';
@@ -16,6 +16,7 @@ interface MonthViewProps {
   selectedDate: Date;
   events: DailyComponentItem[];
   onDayPress?: (date: Date) => void;
+  goToTodayTrigger?: number;
 }
 
 interface MonthSection {
@@ -24,38 +25,106 @@ interface MonthSection {
   weeks: Date[][];
 }
 
-const MONTHS_RANGE = 12; // 현재 월 기준 ±12개월
+const INITIAL_RANGE = 12; // 초기 ±12개월
+const LOAD_MORE_COUNT = 12; // 추가 로드 시 12개월씩
+const LOAD_MORE_THRESHOLD = 3; // 끝에서 3개 남으면 추가 로드
 
-function generateMonthSections(centerDate: Date): MonthSection[] {
+function createMonthSection(date: Date): MonthSection {
+  const weeks = getMonthWeeks(date);
+  return {
+    key: `${date.getFullYear()}-${date.getMonth()}`,
+    month: date,
+    weeks,
+  };
+}
+
+function generateInitialSections(centerDate: Date): MonthSection[] {
   const sections: MonthSection[] = [];
-  for (let i = -MONTHS_RANGE; i <= MONTHS_RANGE; i++) {
-    const month = addMonths(centerDate, i);
-    const weeks = getMonthWeeks(month);
-    sections.push({
-      key: `${month.getFullYear()}-${month.getMonth()}`,
-      month,
-      weeks,
-    });
+  for (let i = -INITIAL_RANGE; i <= INITIAL_RANGE; i++) {
+    sections.push(createMonthSection(addMonths(centerDate, i)));
   }
   return sections;
 }
 
-export function MonthView({selectedDate, events, onDayPress}: MonthViewProps) {
+export function MonthView({selectedDate, events, onDayPress, goToTodayTrigger}: MonthViewProps) {
   const flatListRef = useRef<FlatList>(null);
+  const [sections, setSections] = useState(() =>
+    generateInitialSections(selectedDate),
+  );
+  const isLoadingRef = useRef(false);
 
-  const sections = useMemo(
-    () => generateMonthSections(selectedDate),
-    [selectedDate],
+  // 초기 스크롤 인덱스
+  const initialIndex = INITIAL_RANGE;
+
+  // 오늘 버튼: 데이터 재생성 + 오늘 월로 스크롤
+  useEffect(() => {
+    if (goToTodayTrigger == null || goToTodayTrigger === 0) {
+      return;
+    }
+    const today = new Date();
+    const newSections = generateInitialSections(today);
+    setSections(newSections);
+    setTimeout(() => {
+      flatListRef.current?.scrollToIndex({index: INITIAL_RANGE, animated: true});
+    }, 50);
+  }, [goToTodayTrigger]);
+
+  // 뒤쪽에 월 추가 (아래로 스크롤)
+  const handleEndReached = useCallback(() => {
+    if (isLoadingRef.current) {
+      return;
+    }
+    isLoadingRef.current = true;
+    setSections(prev => {
+      const lastMonth = prev[prev.length - 1].month;
+      const newSections = [...prev];
+      for (let i = 1; i <= LOAD_MORE_COUNT; i++) {
+        newSections.push(createMonthSection(addMonths(lastMonth, i)));
+      }
+      return newSections;
+    });
+    isLoadingRef.current = false;
+  }, []);
+
+  // 앞쪽에 월 추가 (위로 스크롤)
+  const handleStartReached = useCallback(() => {
+    if (isLoadingRef.current) {
+      return;
+    }
+    isLoadingRef.current = true;
+    setSections(prev => {
+      const firstMonth = prev[0].month;
+      const newSections: MonthSection[] = [];
+      for (let i = LOAD_MORE_COUNT; i >= 1; i--) {
+        newSections.push(createMonthSection(addMonths(firstMonth, -i)));
+      }
+      return [...newSections, ...prev];
+    });
+    isLoadingRef.current = false;
+  }, []);
+
+  // 스크롤 위치 감시 → 상단 근접 시 앞쪽 데이터 추가
+  const handleViewableItemsChanged = useCallback(
+    ({viewableItems}: {viewableItems: Array<{index: number | null}>}) => {
+      if (viewableItems.length === 0) {
+        return;
+      }
+      const firstVisible = viewableItems[0]?.index;
+      if (firstVisible != null && firstVisible < LOAD_MORE_THRESHOLD) {
+        handleStartReached();
+      }
+    },
+    [handleStartReached],
   );
 
-  // 현재 월 인덱스로 초기 스크롤
-  const initialIndex = MONTHS_RANGE;
+  const viewabilityConfig = useRef({
+    itemVisiblePercentThreshold: 10,
+  }).current;
 
   const renderMonthItem = useCallback(
     ({item}: {item: MonthSection}) => {
       return (
         <View style={styles.monthContainer}>
-          {/* 월 헤더 (첫 번째 월 제외 시 표시) */}
           <Text style={styles.monthHeader}>
             {formatMonthTitle(item.month)}
           </Text>
@@ -76,7 +145,6 @@ export function MonthView({selectedDate, events, onDayPress}: MonthViewProps) {
 
   const getItemLayout = useCallback(
     (_data: any, index: number) => {
-      // 대략적인 높이 추정 (주 수에 따라 다름)
       const estimatedHeight = 450;
       return {
         length: estimatedHeight,
@@ -101,6 +169,11 @@ export function MonthView({selectedDate, events, onDayPress}: MonthViewProps) {
         removeClippedSubviews
         maxToRenderPerBatch={3}
         windowSize={5}
+        onEndReached={handleEndReached}
+        onEndReachedThreshold={0.5}
+        onViewableItemsChanged={handleViewableItemsChanged}
+        viewabilityConfig={viewabilityConfig}
+        maintainVisibleContentPosition={{minIndexForVisible: 0}}
       />
     </View>
   );
