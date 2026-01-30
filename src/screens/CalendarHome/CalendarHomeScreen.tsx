@@ -1,4 +1,4 @@
-import React, {useCallback} from 'react';
+import React, {useCallback, useState} from 'react';
 import {View, StyleSheet} from 'react-native';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {COLORS} from '../../utils/colors';
@@ -8,12 +8,14 @@ import {CalendarHeader} from './CalendarHeader';
 import {BottomBar} from './BottomBar';
 import {MonthView} from './MonthView/MonthView';
 import {TimelinePager} from './TimelineView/TimelinePager';
+import {SideMenu} from './SideMenu/SideMenu';
 
 export function CalendarHomeScreen() {
   const insets = useSafeAreaInsets();
   const {viewType, selectedDate, setSelectedDate, goToTodayTrigger} =
     useCalendarStore();
   const {events} = useCalendarEvents();
+  const [sideMenuVisible, setSideMenuVisible] = useState(false);
 
   const handleDayPress = useCallback(
     (date: Date) => {
@@ -61,10 +63,14 @@ export function CalendarHomeScreen() {
 
   return (
     <View style={[styles.container, {paddingTop: insets.top}]}>
-      <CalendarHeader />
+      <CalendarHeader onMenuOpen={() => setSideMenuVisible(true)} />
       <View style={styles.content}>{renderContent()}</View>
       <BottomBar />
       <View style={{height: insets.bottom}} />
+      <SideMenu
+        visible={sideMenuVisible}
+        onClose={() => setSideMenuVisible(false)}
+      />
     </View>
   );
 }
