@@ -8,6 +8,7 @@ import {CalendarHeader} from './CalendarHeader';
 import {BottomBar} from './BottomBar';
 import {MonthView} from './MonthView/MonthView';
 import {TimelinePager} from './TimelineView/TimelinePager';
+import {ListView} from './ListView/ListView';
 import {SideMenu} from './SideMenu/SideMenu';
 
 export function CalendarHomeScreen() {
@@ -44,6 +45,16 @@ export function CalendarHomeScreen() {
           selectedDate={selectedDate}
           events={events}
           onDayPress={handleDayPress}
+          goToTodayTrigger={goToTodayTrigger}
+        />
+      );
+    }
+    if (viewType === 'list') {
+      return (
+        <ListView
+          selectedDate={selectedDate}
+          events={events}
+          onEventPress={handleEventPress}
           goToTodayTrigger={goToTodayTrigger}
         />
       );

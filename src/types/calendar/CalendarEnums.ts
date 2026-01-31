@@ -76,7 +76,8 @@ export type CalendarViewType =
   | 'month'
   | 'week'
   | 'day'
-  | 'threeDays';
+  | 'threeDays'
+  | 'list';
 
 // ============================================================
 // 동기화

@@ -25,7 +25,7 @@ interface SideMenuProps {
   onSettings?: () => void;
 }
 
-const VIEW_TYPE_OPTIONS: {type: CalendarViewType | 'list'; label: string}[] = [
+const VIEW_TYPE_OPTIONS: {type: CalendarViewType; label: string}[] = [
   {type: 'month', label: '한달'},
   {type: 'week', label: '일주일'},
   {type: 'threeDays', label: '3일'},
@@ -77,11 +77,7 @@ export function SideMenu({visible, onClose, onSettings}: SideMenuProps) {
     }
   }, [visible, translateX, backdropOpacity]);
 
-  const handleViewTypeSelect = (type: CalendarViewType | 'list') => {
-    if (type === 'list') {
-      // 목록 뷰는 미구현
-      return;
-    }
+  const handleViewTypeSelect = (type: CalendarViewType) => {
     setViewType(type);
     onClose();
   };
@@ -126,24 +122,19 @@ export function SideMenu({visible, onClose, onSettings}: SideMenuProps) {
         {/* View Type Selector */}
         <View style={styles.viewTypeSection}>
           {VIEW_TYPE_OPTIONS.map(option => {
-            const isSelected =
-              option.type !== 'list' && viewType === option.type;
-            const isDisabled = option.type === 'list';
+            const isSelected = viewType === option.type;
             return (
               <TouchableOpacity
                 key={option.type}
                 style={[
                   styles.viewTypeButton,
                   isSelected && styles.viewTypeButtonSelected,
-                  isDisabled && styles.viewTypeButtonDisabled,
                 ]}
-                onPress={() => handleViewTypeSelect(option.type)}
-                disabled={isDisabled}>
+                onPress={() => handleViewTypeSelect(option.type)}>
                 <Text
                   style={[
                     styles.viewTypeText,
                     isSelected && styles.viewTypeTextSelected,
-                    isDisabled && styles.viewTypeTextDisabled,
                   ]}>
                   {option.label}
                 </Text>
