@@ -6,9 +6,8 @@ import {
   TouchableWithoutFeedback,
   StyleSheet,
   Animated,
-  PanResponder,
-  type GestureResponderEvent,
-  type PanResponderGestureState,
+  FlatList,
+  useWindowDimensions,
 } from 'react-native';
 import {COLORS} from '../../utils/colors';
 import {
@@ -21,6 +20,32 @@ import {
   isSameMonth,
   isSunday,
 } from '../../utils/dateUtils';
+
+const INITIAL_PAGES = 12;
+const LOAD_MORE_COUNT = 12;
+const LOAD_MORE_THRESHOLD = 3;
+const POPUP_MARGIN_H = 16;
+const POPUP_PADDING_H = 12;
+
+interface MonthPage {
+  key: string;
+  month: Date;
+}
+
+function createMonthPage(date: Date): MonthPage {
+  return {
+    key: `${date.getFullYear()}-${date.getMonth()}`,
+    month: new Date(date.getFullYear(), date.getMonth(), 1),
+  };
+}
+
+function generateInitialPages(baseDate: Date): MonthPage[] {
+  const pages: MonthPage[] = [];
+  for (let i = -INITIAL_PAGES; i <= INITIAL_PAGES; i++) {
+    pages.push(createMonthPage(addMonths(baseDate, i)));
+  }
+  return pages;
+}
 
 interface MonthPickerPopupProps {
   visible: boolean;
@@ -35,14 +60,24 @@ export function MonthPickerPopup({
   onSelectDate,
   onClose,
 }: MonthPickerPopupProps) {
+  const {width: screenWidth} = useWindowDimensions();
+  const contentWidth = screenWidth - POPUP_MARGIN_H * 2 - POPUP_PADDING_H * 2;
+
   const [displayMonth, setDisplayMonth] = useState(selectedDate);
   const [shouldRender, setShouldRender] = useState(visible);
+  const [pages, setPages] = useState(() => generateInitialPages(selectedDate));
   const overlayOpacity = useRef(new Animated.Value(0)).current;
   const popupTranslateY = useRef(new Animated.Value(-20)).current;
+  const flatListRef = useRef<FlatList>(null);
+  const currentIndexRef = useRef(INITIAL_PAGES);
+  const isLoadingRef = useRef(false);
 
   useEffect(() => {
     if (visible) {
       setShouldRender(true);
+      setPages(generateInitialPages(selectedDate));
+      setDisplayMonth(selectedDate);
+      currentIndexRef.current = INITIAL_PAGES;
       Animated.parallel([
         Animated.timing(overlayOpacity, {
           toValue: 1,
@@ -69,34 +104,84 @@ export function MonthPickerPopup({
         }),
       ]).start(() => setShouldRender(false));
     }
-  }, [visible, overlayOpacity, popupTranslateY]);
+  }, [visible, overlayOpacity, popupTranslateY, selectedDate]);
 
   const goToPrevMonth = useCallback(() => {
-    setDisplayMonth(prev => addMonths(prev, -1));
+    const newIndex = currentIndexRef.current - 1;
+    if (newIndex >= 0) {
+      flatListRef.current?.scrollToIndex({index: newIndex, animated: true});
+    }
   }, []);
 
   const goToNextMonth = useCallback(() => {
-    setDisplayMonth(prev => addMonths(prev, 1));
+    const newIndex = currentIndexRef.current + 1;
+    if (newIndex < pages.length) {
+      flatListRef.current?.scrollToIndex({index: newIndex, animated: true});
+    }
+  }, [pages.length]);
+
+  const handleEndReached = useCallback(() => {
+    if (isLoadingRef.current) {
+      return;
+    }
+    isLoadingRef.current = true;
+    setPages(prev => {
+      const lastPage = prev[prev.length - 1];
+      const newPages = [...prev];
+      for (let i = 1; i <= LOAD_MORE_COUNT; i++) {
+        newPages.push(createMonthPage(addMonths(lastPage.month, i)));
+      }
+      return newPages;
+    });
+    isLoadingRef.current = false;
   }, []);
 
-  const panResponder = useRef(
-    PanResponder.create({
-      onMoveShouldSetPanResponder: (
-        _evt: GestureResponderEvent,
-        gestureState: PanResponderGestureState,
-      ) => Math.abs(gestureState.dx) > 15,
-      onPanResponderRelease: (
-        _evt: GestureResponderEvent,
-        gestureState: PanResponderGestureState,
-      ) => {
-        if (gestureState.dx > 50) {
-          setDisplayMonth(prev => addMonths(prev, -1));
-        } else if (gestureState.dx < -50) {
-          setDisplayMonth(prev => addMonths(prev, 1));
-        }
-      },
-    }),
-  ).current;
+  const handleStartReached = useCallback(() => {
+    if (isLoadingRef.current) {
+      return;
+    }
+    isLoadingRef.current = true;
+    setPages(prev => {
+      const firstPage = prev[0];
+      const newPages: MonthPage[] = [];
+      for (let i = LOAD_MORE_COUNT; i >= 1; i--) {
+        newPages.push(createMonthPage(addMonths(firstPage.month, -i)));
+      }
+      return [...newPages, ...prev];
+    });
+    currentIndexRef.current += LOAD_MORE_COUNT;
+    isLoadingRef.current = false;
+  }, []);
+
+  const handleViewableItemsChanged = useCallback(
+    ({
+      viewableItems,
+    }: {
+      viewableItems: Array<{index: number | null; item: MonthPage}>;
+    }) => {
+      if (viewableItems.length === 0) {
+        return;
+      }
+      const firstVisible = viewableItems[0];
+      if (firstVisible?.item) {
+        setDisplayMonth(firstVisible.item.month);
+      }
+      if (
+        firstVisible?.index != null &&
+        firstVisible.index < LOAD_MORE_THRESHOLD
+      ) {
+        handleStartReached();
+      }
+      if (firstVisible?.index != null) {
+        currentIndexRef.current = firstVisible.index;
+      }
+    },
+    [handleStartReached],
+  );
+
+  const viewabilityConfig = useRef({
+    itemVisiblePercentThreshold: 50,
+  }).current;
 
   const handleSelectDate = useCallback(
     (date: Date) => {
@@ -106,11 +191,67 @@ export function MonthPickerPopup({
     [onSelectDate, onClose],
   );
 
+  const getItemLayout = useCallback(
+    (_data: any, index: number) => ({
+      length: contentWidth,
+      offset: contentWidth * index,
+      index,
+    }),
+    [contentWidth],
+  );
+
+  const renderMonthGrid = useCallback(
+    ({item}: {item: MonthPage}) => {
+      const weeks = getMonthWeeks(item.month);
+      return (
+        <View style={{width: contentWidth}}>
+          {weeks.map((week, weekIndex) => (
+            <View key={weekIndex} style={styles.weekRow}>
+              {week.map((date, dayIndex) => {
+                const inMonth = isSameMonth(date, item.month);
+                const today = isToday(date);
+                const selected = isSameDay(date, selectedDate) && !today;
+
+                return (
+                  <TouchableOpacity
+                    key={dayIndex}
+                    style={styles.dayCell}
+                    onPress={() => handleSelectDate(date)}
+                    activeOpacity={0.6}>
+                    <View
+                      style={[
+                        styles.dayNumber,
+                        today && styles.todayBg,
+                        selected && styles.selectedBg,
+                      ]}>
+                      <Text
+                        style={[
+                          styles.dayText,
+                          !inMonth && styles.otherMonthText,
+                          isSunday(date) &&
+                            inMonth &&
+                            !today &&
+                            styles.sundayText,
+                          today && styles.todayText,
+                          selected && styles.selectedText,
+                        ]}>
+                        {date.getDate()}
+                      </Text>
+                    </View>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          ))}
+        </View>
+      );
+    },
+    [contentWidth, selectedDate, handleSelectDate],
+  );
+
   if (!shouldRender) {
     return null;
   }
-
-  const weeks = getMonthWeeks(displayMonth);
 
   return (
     <TouchableWithoutFeedback onPress={onClose}>
@@ -153,45 +294,26 @@ export function MonthPickerPopup({
               ))}
             </View>
 
-            {/* 날짜 그리드 */}
-            <View {...panResponder.panHandlers}>
-            {weeks.map((week, weekIndex) => (
-              <View key={weekIndex} style={styles.weekRow}>
-                {week.map((date, dayIndex) => {
-                  const inMonth = isSameMonth(date, displayMonth);
-                  const today = isToday(date);
-                  const selected =
-                    isSameDay(date, selectedDate) && !today;
-
-                  return (
-                    <TouchableOpacity
-                      key={dayIndex}
-                      style={styles.dayCell}
-                      onPress={() => handleSelectDate(date)}
-                      activeOpacity={0.6}>
-                      <View
-                        style={[
-                          styles.dayNumber,
-                          today && styles.todayBg,
-                          selected && styles.selectedBg,
-                        ]}>
-                        <Text
-                          style={[
-                            styles.dayText,
-                            !inMonth && styles.otherMonthText,
-                            isSunday(date) && inMonth && !today && styles.sundayText,
-                            today && styles.todayText,
-                            selected && styles.selectedText,
-                          ]}>
-                          {date.getDate()}
-                        </Text>
-                      </View>
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
-            ))}
-            </View>
+            {/* 날짜 그리드 - FlatList 가로 페이징 */}
+            <FlatList
+              ref={flatListRef}
+              data={pages}
+              renderItem={renderMonthGrid}
+              keyExtractor={item => item.key}
+              horizontal
+              pagingEnabled
+              initialScrollIndex={INITIAL_PAGES}
+              getItemLayout={getItemLayout}
+              showsHorizontalScrollIndicator={false}
+              onEndReached={handleEndReached}
+              onEndReachedThreshold={0.5}
+              onViewableItemsChanged={handleViewableItemsChanged}
+              viewabilityConfig={viewabilityConfig}
+              maintainVisibleContentPosition={{minIndexForVisible: 0}}
+              removeClippedSubviews
+              maxToRenderPerBatch={3}
+              windowSize={3}
+            />
           </Animated.View>
         </TouchableWithoutFeedback>
       </Animated.View>
@@ -211,11 +333,11 @@ const styles = StyleSheet.create({
   },
   popup: {
     marginTop: 44,
-    marginHorizontal: 16,
+    marginHorizontal: POPUP_MARGIN_H,
     backgroundColor: COLORS.background,
     borderRadius: 12,
     paddingVertical: 16,
-    paddingHorizontal: 12,
+    paddingHorizontal: POPUP_PADDING_H,
     shadowColor: '#000',
     shadowOffset: {width: 0, height: 2},
     shadowOpacity: 0.15,
