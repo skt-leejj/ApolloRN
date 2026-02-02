@@ -16,7 +16,7 @@ interface TimelinePagerProps {
   onDayPress?: (date: Date) => void;
   onEventPress?: (eventId: string) => void;
   onPageChanged?: (date: Date) => void;
-  goToTodayTrigger?: number;
+  navigateToDateTrigger?: number;
 }
 
 interface TimelinePage {
@@ -90,7 +90,7 @@ export function TimelinePager({
   onDayPress,
   onEventPress,
   onPageChanged,
-  goToTodayTrigger,
+  navigateToDateTrigger,
 }: TimelinePagerProps) {
   const {width} = useWindowDimensions();
   const flatListRef = useRef<FlatList>(null);
@@ -106,17 +106,16 @@ export function TimelinePager({
     currentIndexRef.current = INITIAL_PAGES;
   }, [numberOfDays]);
 
-  // 오늘 버튼: 데이터 재생성 + 오늘 페이지로 스크롤
+  // 외부 날짜 이동 요청 (오늘 버튼, MonthPickerPopup 등)
   useEffect(() => {
-    if (goToTodayTrigger == null || goToTodayTrigger === 0) {
+    if (navigateToDateTrigger == null || navigateToDateTrigger === 0) {
       return;
     }
-    const today = new Date();
-    setPages(generateInitialPages(today, numberOfDays));
+    setPages(generateInitialPages(selectedDate, numberOfDays));
     setTimeout(() => {
       flatListRef.current?.scrollToIndex({index: INITIAL_PAGES, animated: true});
     }, 50);
-  }, [goToTodayTrigger, numberOfDays]);
+  }, [navigateToDateTrigger]); // selectedDate가 아닌 trigger에만 반응
 
   // 뒤쪽에 페이지 추가
   const handleEndReached = useCallback(() => {

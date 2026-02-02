@@ -9,6 +9,8 @@ interface CalendarHeaderProps {
   onSettings?: () => void;
   onScan?: () => void;
   onMenuOpen?: () => void;
+  onTitlePress?: () => void;
+  isPopupOpen?: boolean;
 }
 
 export function CalendarHeader({
@@ -16,6 +18,8 @@ export function CalendarHeader({
   onSettings,
   onScan,
   onMenuOpen,
+  onTitlePress,
+  isPopupOpen = false,
 }: CalendarHeaderProps) {
   const {viewType, selectedDate} = useCalendarStore();
   const title = formatHeaderTitle(selectedDate, viewType);
@@ -26,10 +30,13 @@ export function CalendarHeader({
         <Text style={styles.backIcon}>{'<'}</Text>
       </TouchableOpacity>
 
-      <View style={styles.titleContainer}>
+      <TouchableOpacity
+        style={styles.titleContainer}
+        onPress={onTitlePress}
+        activeOpacity={0.6}>
         <Text style={styles.titleText}>{title}</Text>
-        <Text style={styles.dropdownArrow}> ∨</Text>
-      </View>
+        <Text style={styles.dropdownArrow}>{isPopupOpen ? ' ∧' : ' ∨'}</Text>
+      </TouchableOpacity>
 
       <View style={styles.rightIcons}>
         <TouchableOpacity style={styles.iconButton} onPress={onMenuOpen}>

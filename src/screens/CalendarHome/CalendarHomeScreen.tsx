@@ -10,13 +10,30 @@ import {MonthView} from './MonthView/MonthView';
 import {TimelinePager} from './TimelineView/TimelinePager';
 import {ListView} from './ListView/ListView';
 import {SideMenu} from './SideMenu/SideMenu';
+import {MonthPickerPopup} from './MonthPickerPopup';
 
 export function CalendarHomeScreen() {
   const insets = useSafeAreaInsets();
-  const {viewType, selectedDate, setSelectedDate, goToTodayTrigger} =
+  const {viewType, selectedDate, setSelectedDate, navigateToDate, navigateToDateTrigger} =
     useCalendarStore();
   const {events} = useCalendarEvents();
   const [sideMenuVisible, setSideMenuVisible] = useState(false);
+  const [monthPickerVisible, setMonthPickerVisible] = useState(false);
+
+  const toggleMonthPicker = useCallback(() => {
+    setMonthPickerVisible(prev => !prev);
+  }, []);
+
+  const closeMonthPicker = useCallback(() => {
+    setMonthPickerVisible(false);
+  }, []);
+
+  const handleMonthPickerSelect = useCallback(
+    (date: Date) => {
+      navigateToDate(date);
+    },
+    [navigateToDate],
+  );
 
   const handleDayPress = useCallback(
     (date: Date) => {
@@ -45,7 +62,7 @@ export function CalendarHomeScreen() {
           selectedDate={selectedDate}
           events={events}
           onDayPress={handleDayPress}
-          goToTodayTrigger={goToTodayTrigger}
+          navigateToDateTrigger={navigateToDateTrigger}
         />
       );
     }
@@ -55,7 +72,7 @@ export function CalendarHomeScreen() {
           selectedDate={selectedDate}
           events={events}
           onEventPress={handleEventPress}
-          goToTodayTrigger={goToTodayTrigger}
+          navigateToDateTrigger={navigateToDateTrigger}
         />
       );
     }
@@ -67,17 +84,27 @@ export function CalendarHomeScreen() {
         onDayPress={handleDayPress}
         onEventPress={handleEventPress}
         onPageChanged={handlePageChanged}
-        goToTodayTrigger={goToTodayTrigger}
+        navigateToDateTrigger={navigateToDateTrigger}
       />
     );
   };
 
   return (
     <View style={[styles.container, {paddingTop: insets.top}]}>
-      <CalendarHeader onMenuOpen={() => setSideMenuVisible(true)} />
+      <CalendarHeader
+        onMenuOpen={() => setSideMenuVisible(true)}
+        onTitlePress={toggleMonthPicker}
+        isPopupOpen={monthPickerVisible}
+      />
       <View style={styles.content}>{renderContent()}</View>
       <BottomBar />
       <View style={{height: insets.bottom}} />
+      <MonthPickerPopup
+        visible={monthPickerVisible}
+        selectedDate={selectedDate}
+        onSelectDate={handleMonthPickerSelect}
+        onClose={closeMonthPicker}
+      />
       <SideMenu
         visible={sideMenuVisible}
         onClose={() => setSideMenuVisible(false)}

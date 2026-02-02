@@ -16,7 +16,7 @@ interface MonthViewProps {
   selectedDate: Date;
   events: DailyComponentItem[];
   onDayPress?: (date: Date) => void;
-  goToTodayTrigger?: number;
+  navigateToDateTrigger?: number;
 }
 
 interface MonthSection {
@@ -46,7 +46,7 @@ function generateInitialSections(centerDate: Date): MonthSection[] {
   return sections;
 }
 
-export function MonthView({selectedDate, events, onDayPress, goToTodayTrigger}: MonthViewProps) {
+export function MonthView({selectedDate, events, onDayPress, navigateToDateTrigger}: MonthViewProps) {
   const flatListRef = useRef<FlatList>(null);
   const [sections, setSections] = useState(() =>
     generateInitialSections(selectedDate),
@@ -56,18 +56,17 @@ export function MonthView({selectedDate, events, onDayPress, goToTodayTrigger}: 
   // 초기 스크롤 인덱스
   const initialIndex = INITIAL_RANGE;
 
-  // 오늘 버튼: 데이터 재생성 + 오늘 월로 스크롤
+  // 외부 날짜 이동 요청 (오늘 버튼, MonthPickerPopup 등)
   useEffect(() => {
-    if (goToTodayTrigger == null || goToTodayTrigger === 0) {
+    if (navigateToDateTrigger == null || navigateToDateTrigger === 0) {
       return;
     }
-    const today = new Date();
-    const newSections = generateInitialSections(today);
+    const newSections = generateInitialSections(selectedDate);
     setSections(newSections);
     setTimeout(() => {
       flatListRef.current?.scrollToIndex({index: INITIAL_RANGE, animated: true});
     }, 50);
-  }, [goToTodayTrigger]);
+  }, [navigateToDateTrigger]); // selectedDate가 아닌 trigger에만 반응
 
   // 뒤쪽에 월 추가 (아래로 스크롤)
   const handleEndReached = useCallback(() => {

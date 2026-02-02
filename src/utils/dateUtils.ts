@@ -50,6 +50,10 @@ export function getWeekdayName(dayIndex: number): string {
   return WEEKDAY_NAMES[dayIndex];
 }
 
+export function formatYearMonth(date: Date): string {
+  return `${date.getFullYear()}년 ${date.getMonth() + 1}월`;
+}
+
 export function formatMonthTitle(date: Date): string {
   return `${date.getMonth() + 1}월`;
 }

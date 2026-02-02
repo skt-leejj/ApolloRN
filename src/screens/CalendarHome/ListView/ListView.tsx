@@ -16,7 +16,7 @@ interface ListViewProps {
   selectedDate: Date;
   events: DailyComponentItem[];
   onEventPress?: (eventId: string) => void;
-  goToTodayTrigger?: number;
+  navigateToDateTrigger?: number;
 }
 
 interface DateSectionType {
@@ -32,7 +32,7 @@ export function ListView({
   selectedDate,
   events,
   onEventPress,
-  goToTodayTrigger,
+  navigateToDateTrigger,
 }: ListViewProps) {
   const [dateSections, setDateSections] = useState<DateSectionType[]>([]);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -48,23 +48,6 @@ export function ListView({
   const getDateKey = (date: Date) => {
     return date.toISOString().split('T')[0];
   };
-
-  const scrollToToday = useCallback(() => {
-    setTimeout(() => {
-      const todayIndex = dateSectionsRef.current.findIndex(section => {
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
-        return getDateKey(section.date) === getDateKey(today);
-      });
-
-      if (todayIndex !== -1) {
-        flatListRef.current?.scrollToIndex({
-          index: todayIndex,
-          animated: true,
-        });
-      }
-    }, 100);
-  }, []);
 
   const initializeDateRange = useCallback(() => {
     const today = new Date();
@@ -130,12 +113,20 @@ export function ListView({
     dateSectionsRef.current = sections;
   }, [initializeDateRange, events]);
 
-  // goToTodayTrigger - 명시적으로 오늘로 버튼을 눌렀을 때만
+  // 외부 날짜 이동 요청 (오늘 버튼, MonthPickerPopup 등)
   useEffect(() => {
-    if (goToTodayTrigger !== undefined && goToTodayTrigger > 0) {
-      scrollToToday();
+    if (navigateToDateTrigger == null || navigateToDateTrigger === 0) {
+      return;
     }
-  }, [goToTodayTrigger, scrollToToday]);
+    // selectedDate 기준으로 해당 날짜 섹션으로 스크롤
+    const targetKey = getDateKey(selectedDate);
+    const targetIndex = dateSectionsRef.current.findIndex(
+      section => getDateKey(section.date) === targetKey,
+    );
+    if (targetIndex !== -1) {
+      flatListRef.current?.scrollToIndex({index: targetIndex, animated: true});
+    }
+  }, [navigateToDateTrigger]); // selectedDate가 아닌 trigger에만 반응
 
   const loadMoreDays = useCallback(
     async (direction: 'past' | 'future') => {
