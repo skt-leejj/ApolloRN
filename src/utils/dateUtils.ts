@@ -149,3 +149,81 @@ export function parseDateString(dateStr: string): Date {
 export function toDateKey(date: Date): string {
   return format(date, 'yyyy-MM-dd');
 }
+
+/**
+ * 전체 날짜 포맷: "2025년 7월 10일 수요일"
+ */
+export function formatFullDate(date: Date): string {
+  const year = date.getFullYear();
+  const month = date.getMonth() + 1;
+  const day = date.getDate();
+  const weekday = WEEKDAY_NAMES[getDay(date)];
+  return `${year}년 ${month}월 ${day}일 ${weekday}요일`;
+}
+
+/**
+ * 시간 포맷: "오전 8시 20분"
+ */
+export function formatDetailTime(date: Date): string {
+  const hours = date.getHours();
+  const minutes = date.getMinutes();
+  const period = hours >= 12 ? '오후' : '오전';
+  const displayHours = hours > 12 ? hours - 12 : hours === 0 ? 12 : hours;
+  if (minutes === 0) {
+    return `${period} ${displayHours}시`;
+  }
+  return `${period} ${displayHours}시 ${minutes}분`;
+}
+
+/**
+ * D-day 계산: "D-8", "D-Day", "D+3"
+ */
+export function calculateDDay(targetDate: Date): string {
+  const today = startOfDay(new Date());
+  const target = startOfDay(targetDate);
+  const diffMs = target.getTime() - today.getTime();
+  const diffDays = Math.round(diffMs / (1000 * 60 * 60 * 24));
+  if (diffDays === 0) {
+    return 'D-Day';
+  }
+  if (diffDays > 0) {
+    return `D-${diffDays}`;
+  }
+  return `D+${Math.abs(diffDays)}`;
+}
+
+/**
+ * 반복 패턴 라벨: "매일", "매주", "7개월 간격" 등
+ */
+export function formatRecurrenceLabel(recurrence: {
+  frequency: string;
+  interval: number;
+}): string {
+  const {frequency, interval} = recurrence;
+  if (interval === 1) {
+    switch (frequency) {
+      case 'daily':
+        return '매일';
+      case 'weekly':
+        return '매주';
+      case 'monthly':
+        return '매월';
+      case 'yearly':
+        return '매년';
+      default:
+        return '반복';
+    }
+  }
+  switch (frequency) {
+    case 'daily':
+      return `${interval}일 간격`;
+    case 'weekly':
+      return `${interval}주 간격`;
+    case 'monthly':
+      return `${interval}개월 간격`;
+    case 'yearly':
+      return `${interval}년 간격`;
+    default:
+      return `${interval} 간격`;
+  }
+}

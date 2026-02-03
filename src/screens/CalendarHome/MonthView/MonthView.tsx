@@ -16,6 +16,7 @@ interface MonthViewProps {
   selectedDate: Date;
   events: DailyComponentItem[];
   onDayPress?: (date: Date) => void;
+  onEventPress?: (eventId: string) => void;
   navigateToDateTrigger?: number;
 }
 
@@ -46,7 +47,7 @@ function generateInitialSections(centerDate: Date): MonthSection[] {
   return sections;
 }
 
-export function MonthView({selectedDate, events, onDayPress, navigateToDateTrigger}: MonthViewProps) {
+export function MonthView({selectedDate, events, onDayPress, onEventPress, navigateToDateTrigger}: MonthViewProps) {
   const flatListRef = useRef<FlatList>(null);
   const [sections, setSections] = useState(() =>
     generateInitialSections(selectedDate),
@@ -134,12 +135,13 @@ export function MonthView({selectedDate, events, onDayPress, navigateToDateTrigg
               currentMonth={item.month}
               events={events}
               onDayPress={onDayPress}
+              onEventPress={onEventPress}
             />
           ))}
         </View>
       );
     },
-    [events, onDayPress],
+    [events, onDayPress, onEventPress],
   );
 
   const getItemLayout = useCallback(

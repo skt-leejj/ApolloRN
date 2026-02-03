@@ -1,14 +1,15 @@
 import React from 'react';
-import {View, Text, StyleSheet} from 'react-native';
+import {View, Text, TouchableOpacity, StyleSheet} from 'react-native';
 import type {WeekEventLayout} from './MonthUtils';
 import {LAYOUT} from '../../../utils/colors';
 
 interface EventChipProps {
   layout: WeekEventLayout;
   cellWidth: number;
+  onPress?: (eventId: string) => void;
 }
 
-export function EventChip({layout, cellWidth}: EventChipProps) {
+export function EventChip({layout, cellWidth, onPress}: EventChipProps) {
   const {event, startCol, endCol, row} = layout;
   const calendarColor = event.eventDetail.calendar.color;
   const bgColor = calendarColor + '33';
@@ -19,7 +20,9 @@ export function EventChip({layout, cellWidth}: EventChipProps) {
     28 + 4 + row * (LAYOUT.eventChipHeight + LAYOUT.eventChipGap); // dayNumber height + gap + row offset
 
   return (
-    <View
+    <TouchableOpacity
+      activeOpacity={0.7}
+      onPress={() => onPress?.(event.eventDetail.id)}
       style={[
         styles.chip,
         {
@@ -37,7 +40,7 @@ export function EventChip({layout, cellWidth}: EventChipProps) {
         {event.eventDetail.title}
         {isReadOnly ? ' 🔒' : ''}
       </Text>
-    </View>
+    </TouchableOpacity>
   );
 }
 

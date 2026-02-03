@@ -1,6 +1,9 @@
 import React, {useCallback, useState} from 'react';
 import {View, StyleSheet} from 'react-native';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
+import {useNavigation} from '@react-navigation/native';
+import type {NativeStackNavigationProp} from '@react-navigation/native-stack';
+import type {RootStackParamList} from '../../navigation/types';
 import {COLORS} from '../../utils/colors';
 import {useCalendarStore} from './hooks/useCalendarStore';
 import {useCalendarEvents} from './hooks/useCalendarEvents';
@@ -13,6 +16,8 @@ import {SideMenu} from './SideMenu/SideMenu';
 import {MonthPickerPopup} from './MonthPickerPopup';
 
 export function CalendarHomeScreen() {
+  const navigation =
+    useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const insets = useSafeAreaInsets();
   const {viewType, selectedDate, setSelectedDate, navigateToDate, navigateToDateTrigger} =
     useCalendarStore();
@@ -43,8 +48,8 @@ export function CalendarHomeScreen() {
   );
 
   const handleEventPress = useCallback((eventId: string) => {
-    // TODO: 일정 상세 화면 이동
-  }, []);
+    navigation.navigate('EventDetail', {eventId});
+  }, [navigation]);
 
   const handlePageChanged = useCallback(
     (date: Date) => {
@@ -62,6 +67,7 @@ export function CalendarHomeScreen() {
           selectedDate={selectedDate}
           events={events}
           onDayPress={handleDayPress}
+          onEventPress={handleEventPress}
           navigateToDateTrigger={navigateToDateTrigger}
         />
       );
@@ -96,15 +102,17 @@ export function CalendarHomeScreen() {
         onTitlePress={toggleMonthPicker}
         isPopupOpen={monthPickerVisible}
       />
-      <View style={styles.content}>{renderContent()}</View>
-      <BottomBar />
-      <View style={{height: insets.bottom}} />
-      <MonthPickerPopup
-        visible={monthPickerVisible}
-        selectedDate={selectedDate}
-        onSelectDate={handleMonthPickerSelect}
-        onClose={closeMonthPicker}
-      />
+      <View style={styles.contentWrapper}>
+        <View style={styles.content}>{renderContent()}</View>
+        <BottomBar />
+        <View style={{height: insets.bottom}} />
+        <MonthPickerPopup
+          visible={monthPickerVisible}
+          selectedDate={selectedDate}
+          onSelectDate={handleMonthPickerSelect}
+          onClose={closeMonthPicker}
+        />
+      </View>
       <SideMenu
         visible={sideMenuVisible}
         onClose={() => setSideMenuVisible(false)}
@@ -117,6 +125,10 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: COLORS.background,
+  },
+  contentWrapper: {
+    flex: 1,
+    overflow: 'hidden',
   },
   content: {
     flex: 1,

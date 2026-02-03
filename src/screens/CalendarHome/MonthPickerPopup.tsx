@@ -24,8 +24,8 @@ import {
 const INITIAL_PAGES = 12;
 const LOAD_MORE_COUNT = 12;
 const LOAD_MORE_THRESHOLD = 3;
-const POPUP_MARGIN_H = 16;
-const POPUP_PADDING_H = 12;
+const POPUP_PADDING_H = 16;
+const SLIDE_DISTANCE = 400;
 
 interface MonthPage {
   key: string;
@@ -61,13 +61,13 @@ export function MonthPickerPopup({
   onClose,
 }: MonthPickerPopupProps) {
   const {width: screenWidth} = useWindowDimensions();
-  const contentWidth = screenWidth - POPUP_MARGIN_H * 2 - POPUP_PADDING_H * 2;
+  const contentWidth = screenWidth - POPUP_PADDING_H * 2;
 
   const [displayMonth, setDisplayMonth] = useState(selectedDate);
   const [shouldRender, setShouldRender] = useState(visible);
   const [pages, setPages] = useState(() => generateInitialPages(selectedDate));
+  const slideAnim = useRef(new Animated.Value(-SLIDE_DISTANCE)).current;
   const overlayOpacity = useRef(new Animated.Value(0)).current;
-  const popupTranslateY = useRef(new Animated.Value(-20)).current;
   const flatListRef = useRef<FlatList>(null);
   const currentIndexRef = useRef(INITIAL_PAGES);
   const isLoadingRef = useRef(false);
@@ -78,33 +78,35 @@ export function MonthPickerPopup({
       setPages(generateInitialPages(selectedDate));
       setDisplayMonth(selectedDate);
       currentIndexRef.current = INITIAL_PAGES;
+      slideAnim.setValue(-SLIDE_DISTANCE);
+      overlayOpacity.setValue(0);
       Animated.parallel([
-        Animated.timing(overlayOpacity, {
-          toValue: 1,
-          duration: 200,
+        Animated.timing(slideAnim, {
+          toValue: 0,
+          duration: 250,
           useNativeDriver: true,
         }),
-        Animated.timing(popupTranslateY, {
-          toValue: 0,
-          duration: 200,
+        Animated.timing(overlayOpacity, {
+          toValue: 1,
+          duration: 250,
           useNativeDriver: true,
         }),
       ]).start();
     } else {
       Animated.parallel([
-        Animated.timing(overlayOpacity, {
-          toValue: 0,
-          duration: 150,
+        Animated.timing(slideAnim, {
+          toValue: -SLIDE_DISTANCE,
+          duration: 200,
           useNativeDriver: true,
         }),
-        Animated.timing(popupTranslateY, {
-          toValue: -20,
-          duration: 150,
+        Animated.timing(overlayOpacity, {
+          toValue: 0,
+          duration: 200,
           useNativeDriver: true,
         }),
       ]).start(() => setShouldRender(false));
     }
-  }, [visible, overlayOpacity, popupTranslateY, selectedDate]);
+  }, [visible, slideAnim, overlayOpacity, selectedDate]);
 
   const goToPrevMonth = useCallback(() => {
     const newIndex = currentIndexRef.current - 1;
@@ -254,70 +256,69 @@ export function MonthPickerPopup({
   }
 
   return (
-    <TouchableWithoutFeedback onPress={onClose}>
-      <Animated.View style={[styles.overlay, {opacity: overlayOpacity}]}>
-        <TouchableWithoutFeedback>
-          <Animated.View
-            style={[
-              styles.popup,
-              {transform: [{translateY: popupTranslateY}]},
-            ]}>
-            {/* 헤더: 년월 + 좌우 화살표 */}
-            <View style={styles.header}>
-              <TouchableOpacity
-                style={styles.arrowButton}
-                onPress={goToPrevMonth}>
-                <Text style={styles.arrowText}>{'<'}</Text>
-              </TouchableOpacity>
-              <Text style={styles.headerTitle}>
-                {formatYearMonth(displayMonth)}
+    <>
+      {/* 반투명 오버레이 (터치 시 닫기) */}
+      <TouchableWithoutFeedback onPress={onClose}>
+        <Animated.View style={[styles.overlay, {opacity: overlayOpacity}]} />
+      </TouchableWithoutFeedback>
+
+      {/* 팝업 패널 (헤더 아래에서 슬라이드 다운) */}
+      <Animated.View
+        style={[styles.popup, {transform: [{translateY: slideAnim}]}]}>
+        {/* 헤더: 년월 + 좌우 화살표 */}
+        <View style={styles.header}>
+          <TouchableOpacity
+            style={styles.arrowButton}
+            onPress={goToPrevMonth}>
+            <Text style={styles.arrowText}>{'<'}</Text>
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>
+            {formatYearMonth(displayMonth)}
+          </Text>
+          <TouchableOpacity
+            style={styles.arrowButton}
+            onPress={goToNextMonth}>
+            <Text style={styles.arrowText}>{'>'}</Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* 요일 헤더 */}
+        <View style={styles.weekdayRow}>
+          {Array.from({length: 7}, (_, i) => (
+            <View key={i} style={styles.weekdayCell}>
+              <Text
+                style={[
+                  styles.weekdayText,
+                  i === 0 && styles.sundayText,
+                ]}>
+                {getWeekdayName(i)}
               </Text>
-              <TouchableOpacity
-                style={styles.arrowButton}
-                onPress={goToNextMonth}>
-                <Text style={styles.arrowText}>{'>'}</Text>
-              </TouchableOpacity>
             </View>
+          ))}
+        </View>
 
-            {/* 요일 헤더 */}
-            <View style={styles.weekdayRow}>
-              {Array.from({length: 7}, (_, i) => (
-                <View key={i} style={styles.weekdayCell}>
-                  <Text
-                    style={[
-                      styles.weekdayText,
-                      i === 0 && styles.sundayText,
-                    ]}>
-                    {getWeekdayName(i)}
-                  </Text>
-                </View>
-              ))}
-            </View>
-
-            {/* 날짜 그리드 - FlatList 가로 페이징 */}
-            <FlatList
-              ref={flatListRef}
-              data={pages}
-              renderItem={renderMonthGrid}
-              keyExtractor={item => item.key}
-              horizontal
-              pagingEnabled
-              initialScrollIndex={INITIAL_PAGES}
-              getItemLayout={getItemLayout}
-              showsHorizontalScrollIndicator={false}
-              onEndReached={handleEndReached}
-              onEndReachedThreshold={0.5}
-              onViewableItemsChanged={handleViewableItemsChanged}
-              viewabilityConfig={viewabilityConfig}
-              maintainVisibleContentPosition={{minIndexForVisible: 0}}
-              removeClippedSubviews
-              maxToRenderPerBatch={3}
-              windowSize={3}
-            />
-          </Animated.View>
-        </TouchableWithoutFeedback>
+        {/* 날짜 그리드 - FlatList 가로 페이징 */}
+        <FlatList
+          ref={flatListRef}
+          data={pages}
+          renderItem={renderMonthGrid}
+          keyExtractor={item => item.key}
+          horizontal
+          pagingEnabled
+          initialScrollIndex={INITIAL_PAGES}
+          getItemLayout={getItemLayout}
+          showsHorizontalScrollIndicator={false}
+          onEndReached={handleEndReached}
+          onEndReachedThreshold={0.5}
+          onViewableItemsChanged={handleViewableItemsChanged}
+          viewabilityConfig={viewabilityConfig}
+          maintainVisibleContentPosition={{minIndexForVisible: 0}}
+          removeClippedSubviews
+          maxToRenderPerBatch={3}
+          windowSize={3}
+        />
       </Animated.View>
-    </TouchableWithoutFeedback>
+    </>
   );
 }
 
@@ -329,18 +330,21 @@ const styles = StyleSheet.create({
     right: 0,
     bottom: 0,
     backgroundColor: 'rgba(0, 0, 0, 0.3)',
-    zIndex: 100,
+    zIndex: 99,
   },
   popup: {
-    marginTop: 44,
-    marginHorizontal: POPUP_MARGIN_H,
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    zIndex: 100,
     backgroundColor: COLORS.background,
-    borderRadius: 12,
-    paddingVertical: 16,
+    paddingTop: 12,
+    paddingBottom: 16,
     paddingHorizontal: POPUP_PADDING_H,
     shadowColor: '#000',
-    shadowOffset: {width: 0, height: 2},
-    shadowOpacity: 0.15,
+    shadowOffset: {width: 0, height: 4},
+    shadowOpacity: 0.1,
     shadowRadius: 8,
     elevation: 5,
   },

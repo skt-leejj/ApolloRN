@@ -12,6 +12,7 @@ interface WeekRowProps {
   currentMonth: Date;
   events: DailyComponentItem[];
   onDayPress?: (date: Date) => void;
+  onEventPress?: (eventId: string) => void;
 }
 
 export function WeekRow({
@@ -19,6 +20,7 @@ export function WeekRow({
   currentMonth,
   events,
   onDayPress,
+  onEventPress,
 }: WeekRowProps) {
   const [rowWidth, setRowWidth] = useState(0);
 
@@ -60,6 +62,7 @@ export function WeekRow({
             key={`${layout.event.id}-${idx}`}
             layout={layout}
             cellWidth={cellWidth}
+            onPress={onEventPress}
           />
         ))}
 
