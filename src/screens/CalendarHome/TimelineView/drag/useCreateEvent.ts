@@ -1,4 +1,4 @@
-import {useCallback, useMemo, useState} from 'react';
+import {useCallback, useMemo, useState, useEffect} from 'react';
 import {Gesture} from 'react-native-gesture-handler';
 import type {GestureType, ComposedGesture} from 'react-native-gesture-handler';
 import {useSharedValue, runOnJS} from 'react-native-reanimated';
@@ -7,6 +7,7 @@ import ReactNativeHapticFeedback from 'react-native-haptic-feedback';
 import {LAYOUT} from '../../../../utils/colors';
 import {snapToTimeGrid, yToMinutes} from './dragUtils';
 import type {CreateDragSharedValues} from './types';
+import type {EventBlockLayout} from '../TimelineUtils';
 import {
   LONG_PRESS_DURATION,
   DEFAULT_CREATE_DURATION_MIN,
@@ -16,6 +17,7 @@ import {
 interface UseCreateEventParams {
   numberOfDays: 1 | 3 | 7;
   days: Date[];
+  eventLayouts: EventBlockLayout[];
   columnWidth: number;
   scrollOffset: SharedValue<number>;
   onCreateEvent?: (startDate: Date, endDate: Date) => void;
@@ -30,6 +32,7 @@ interface UseCreateEventReturn {
 export function useCreateEvent({
   numberOfDays,
   days,
+  eventLayouts,
   columnWidth,
   scrollOffset,
   onCreateEvent,
@@ -46,6 +49,9 @@ export function useCreateEvent({
   const anchorYSV = useSharedValue(0);
   const expectedScrollSV = useSharedValue(0);
   const panActiveSV = useSharedValue(false);
+  const eventRectsSV = useSharedValue<
+    {x: number; y: number; width: number; height: number}[]
+  >([]);
 
   // Snap change tracking for haptic
   const prevSnappedTop = useSharedValue(0);
@@ -74,6 +80,23 @@ export function useCreateEvent({
     // eslint-disable-next-line react-hooks/exhaustive-deps -- SharedValue refs are stable
     [],
   );
+
+  const eventRects = useMemo(() => {
+    if (columnWidth <= 0) {return [];}
+    return eventLayouts.map(layout => {
+      const colOffset = layout.columnIndex * columnWidth;
+      return {
+        x: colOffset + layout.left * columnWidth,
+        y: layout.top,
+        width: layout.width * columnWidth - 1,
+        height: layout.height,
+      };
+    });
+  }, [eventLayouts, columnWidth]);
+
+  useEffect(() => {
+    eventRectsSV.value = eventRects;
+  }, [eventRects, eventRectsSV]);
 
   // --- JS thread callbacks ---
 
@@ -122,6 +145,28 @@ export function useCreateEvent({
 
     const pan = Gesture.Pan()
       .activateAfterLongPress(LONG_PRESS_DURATION)
+      .onTouchesDown((e, stateManager) => {
+        'worklet';
+        const touch = e.allTouches[0] ?? e.changedTouches[0];
+        if (!touch) {return;}
+
+        const x = touch.x;
+        const y = touch.y;
+        const rects = eventRectsSV.value;
+
+        for (let i = 0; i < rects.length; i++) {
+          const r = rects[i];
+          if (
+            x >= r.x &&
+            x <= r.x + r.width &&
+            y >= r.y &&
+            y <= r.y + r.height
+          ) {
+            stateManager.fail();
+            return;
+          }
+        }
+      })
       .onStart(e => {
         'worklet';
         // e.y는 eventArea 기준 content 좌표 (ScrollView 내부이므로 scrollOffset 불필요)

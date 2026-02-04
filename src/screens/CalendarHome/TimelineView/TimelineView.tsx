@@ -80,6 +80,7 @@ export function TimelineView({
   } = useCreateEvent({
     numberOfDays,
     days,
+    eventLayouts,
     columnWidth,
     scrollOffset,
     onCreateEvent: (startDate, endDate) => {
