@@ -1,6 +1,7 @@
-import React, {useState, useCallback} from 'react';
+import React, {useState, useCallback, useEffect} from 'react';
 import {View, StyleSheet} from 'react-native';
 import type {LayoutChangeEvent} from 'react-native';
+import type {GestureType, ComposedGesture} from 'react-native-gesture-handler';
 import {COLORS, LAYOUT} from '../../../utils/colors';
 import {TimeLabel} from './TimeLabel';
 import {EventBlock} from './EventBlock';
@@ -11,6 +12,9 @@ interface TimelineGridProps {
   eventLayouts: EventBlockLayout[];
   withSpace?: boolean;
   onEventPress?: (eventId: string) => void;
+  gestureMap?: Map<string, GestureType | ComposedGesture>;
+  draggedEventId?: string | null;
+  onColumnWidthChange?: (width: number) => void;
 }
 
 const HOURS = Array.from({length: 24}, (_, i) => i);
@@ -20,6 +24,9 @@ export function TimelineGrid({
   eventLayouts,
   withSpace = false,
   onEventPress,
+  gestureMap,
+  draggedEventId,
+  onColumnWidthChange,
 }: TimelineGridProps) {
   const totalHeight = 24 * LAYOUT.hourHeight;
   const [gridWidth, setGridWidth] = useState(0);
@@ -29,6 +36,13 @@ export function TimelineGrid({
   }, []);
 
   const columnWidth = gridWidth > 0 ? gridWidth / numberOfDays : 0;
+
+  // columnWidth 변경 시 부모에게 알림
+  useEffect(() => {
+    if (columnWidth > 0) {
+      onColumnWidthChange?.(columnWidth);
+    }
+  }, [columnWidth, onColumnWidthChange]);
 
   return (
     <View style={[styles.container, {height: totalHeight}]}>
@@ -61,15 +75,17 @@ export function TimelineGrid({
             const colOffset = layout.columnIndex * columnWidth;
             const blockWidth = layout.width * columnWidth - 1;
             const blockLeft = colOffset + layout.left * columnWidth;
+            const isDragging = draggedEventId === layout.event.id;
+            const gesture = gestureMap?.get(layout.event.id) ?? null;
 
             return (
               <EventBlock
                 key={`${layout.event.id}-${idx}`}
-                layout={{...layout, left: 0, width: 1}}
-                columnWidth={blockWidth}
+                layout={layout}
                 onPress={onEventPress}
-                style={{
-                  position: 'absolute',
+                gesture={gesture}
+                isDragging={isDragging}
+                positionStyle={{
                   top: layout.top,
                   left: blockLeft,
                   width: blockWidth,
