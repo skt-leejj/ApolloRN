@@ -27,19 +27,3 @@ export interface DragSharedValues {
   // Pan 제스처가 실제로 활성화되었는지 (long press만으로는 false)
   panActive: SharedValue<boolean>;
 }
-
-export interface DragCallbacks {
-  onDragStart: (eventId: string) => void;
-  onDragEnd: (
-    eventId: string,
-    newColumnIndex: number,
-    newStartMinutes: number,
-  ) => void;
-  onDragCancel: () => void;
-}
-
-export interface ScrollMetrics {
-  scrollOffset: SharedValue<number>;
-  scrollViewY: number;
-  scrollViewHeight: number;
-}

@@ -7,15 +7,13 @@ import type {DragSharedValues} from './types';
 import type {DailyComponentItem} from '../../../../types/calendar';
 
 interface DragOverlayProps {
-  draggedEventId: string | null;
-  events: DailyComponentItem[];
+  draggedEvent: DailyComponentItem | null;
   sharedValues: DragSharedValues;
   scrollViewY: SharedValue<number>;
 }
 
 export function DragOverlay({
-  draggedEventId,
-  events,
+  draggedEvent,
   sharedValues,
   scrollViewY,
 }: DragOverlayProps) {
@@ -37,14 +35,10 @@ export function DragOverlay({
     };
   });
 
-  const event = draggedEventId
-    ? events.find(e => e.id === draggedEventId)
-    : null;
-
-  if (!event) {
+  if (!draggedEvent) {
     return null;
   }
-  const calendarColor = event.eventDetail.calendar.color;
+  const calendarColor = draggedEvent.eventDetail.calendar.color;
   const bgColor = blendHexOnWhite(calendarColor, 0.4);
 
   return (
@@ -56,7 +50,7 @@ export function DragOverlay({
       ]}
       pointerEvents="none">
       <Text style={[styles.title, {color: calendarColor}]} numberOfLines={2}>
-        {event.eventDetail.title}
+        {draggedEvent.eventDetail.title}
       </Text>
     </Animated.View>
   );

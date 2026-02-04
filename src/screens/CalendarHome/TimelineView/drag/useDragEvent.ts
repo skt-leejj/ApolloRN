@@ -101,7 +101,8 @@ export function useDragEvent({
       expectedScroll: expectedScrollSV,
       panActive: panActiveSV,
     }),
-    [isDraggingSV, overlayX, overlayY, overlayWidth, overlayHeight, overlayOpacity, startContentYSV, expectedScrollSV, panActiveSV],
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- SharedValue refs are stable across renders
+    [],
   );
 
   // --- JS thread callbacks ---
@@ -361,24 +362,13 @@ export function useDragEvent({
     eventLayouts,
     columnWidth,
     numberOfDays,
+    scrollOffset,
     handleDragStart,
     handleDragEnd,
     handleDragCancel,
     handleDragUpdate,
     handleSnapChange,
     onEventPress,
-    overlayX,
-    overlayY,
-    overlayWidth,
-    overlayHeight,
-    overlayOpacity,
-    isDraggingSV,
-    dragActivatedSV,
-    startContentYSV,
-    startColumnXSV,
-    prevSnappedY,
-    prevSnappedCol,
-    panActiveSV,
   ]);
 
   return {

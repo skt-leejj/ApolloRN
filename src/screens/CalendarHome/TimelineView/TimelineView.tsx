@@ -132,8 +132,7 @@ export function TimelineView({
 
       {/* 드래그 오버레이 (ScrollView 밖에 렌더링) */}
       <DragOverlay
-        draggedEventId={dragState.draggedEventId}
-        events={events}
+        draggedEvent={dragState.draggedEventId ? events.find(e => e.id === dragState.draggedEventId) ?? null : null}
         sharedValues={dragSharedValues}
         scrollViewY={scrollViewY}
       />
