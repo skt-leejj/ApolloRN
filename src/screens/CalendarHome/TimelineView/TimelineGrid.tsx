@@ -1,6 +1,7 @@
 import React, {useState, useCallback, useEffect} from 'react';
 import {View, StyleSheet} from 'react-native';
 import type {LayoutChangeEvent} from 'react-native';
+import {GestureDetector} from 'react-native-gesture-handler';
 import type {GestureType, ComposedGesture} from 'react-native-gesture-handler';
 import {COLORS, LAYOUT} from '../../../utils/colors';
 import {TimeLabel} from './TimeLabel';
@@ -15,6 +16,7 @@ interface TimelineGridProps {
   gestureMap?: Map<string, GestureType | ComposedGesture>;
   draggedEventId?: string | null;
   onColumnWidthChange?: (width: number) => void;
+  createGesture?: GestureType | ComposedGesture | null;
 }
 
 const HOURS = Array.from({length: 24}, (_, i) => i);
@@ -27,6 +29,7 @@ export function TimelineGrid({
   gestureMap,
   draggedEventId,
   onColumnWidthChange,
+  createGesture,
 }: TimelineGridProps) {
   const totalHeight = 24 * LAYOUT.hourHeight;
   const [gridWidth, setGridWidth] = useState(0);
@@ -44,6 +47,47 @@ export function TimelineGrid({
     }
   }, [columnWidth, onColumnWidthChange]);
 
+  const eventAreaContent = (
+    <>
+      {/* 컬럼 구분선 */}
+      {Array.from({length: numberOfDays - 1}, (_, i) => (
+        <View
+          key={`divider-${i}`}
+          style={[
+            styles.columnDivider,
+            {left: columnWidth * (i + 1)},
+          ]}
+        />
+      ))}
+
+      {/* 일정 블록 */}
+      {gridWidth > 0 &&
+        eventLayouts.map((layout, idx) => {
+          const colOffset = layout.columnIndex * columnWidth;
+          const blockWidth = layout.width * columnWidth - 1;
+          const blockLeft = colOffset + layout.left * columnWidth;
+          const isDragging = draggedEventId === layout.event.id;
+          const gesture = gestureMap?.get(layout.event.id) ?? null;
+
+          return (
+            <EventBlock
+              key={`${layout.event.id}-${idx}`}
+              layout={layout}
+              onPress={onEventPress}
+              gesture={gesture}
+              isDragging={isDragging}
+              positionStyle={{
+                top: layout.top,
+                left: blockLeft,
+                width: blockWidth,
+                height: layout.height,
+              }}
+            />
+          );
+        })}
+    </>
+  );
+
   return (
     <View style={[styles.container, {height: totalHeight}]}>
       {/* 시간 라벨 + 수평선 */}
@@ -57,44 +101,17 @@ export function TimelineGrid({
       ))}
 
       {/* 이벤트 영역 (시간 라벨 오른쪽) */}
-      <View style={styles.eventArea} onLayout={onGridLayout}>
-        {/* 컬럼 구분선 */}
-        {Array.from({length: numberOfDays - 1}, (_, i) => (
-          <View
-            key={`divider-${i}`}
-            style={[
-              styles.columnDivider,
-              {left: columnWidth * (i + 1)},
-            ]}
-          />
-        ))}
-
-        {/* 일정 블록 */}
-        {gridWidth > 0 &&
-          eventLayouts.map((layout, idx) => {
-            const colOffset = layout.columnIndex * columnWidth;
-            const blockWidth = layout.width * columnWidth - 1;
-            const blockLeft = colOffset + layout.left * columnWidth;
-            const isDragging = draggedEventId === layout.event.id;
-            const gesture = gestureMap?.get(layout.event.id) ?? null;
-
-            return (
-              <EventBlock
-                key={`${layout.event.id}-${idx}`}
-                layout={layout}
-                onPress={onEventPress}
-                gesture={gesture}
-                isDragging={isDragging}
-                positionStyle={{
-                  top: layout.top,
-                  left: blockLeft,
-                  width: blockWidth,
-                  height: layout.height,
-                }}
-              />
-            );
-          })}
-      </View>
+      {createGesture ? (
+        <GestureDetector gesture={createGesture}>
+          <View style={styles.eventArea} onLayout={onGridLayout}>
+            {eventAreaContent}
+          </View>
+        </GestureDetector>
+      ) : (
+        <View style={styles.eventArea} onLayout={onGridLayout}>
+          {eventAreaContent}
+        </View>
+      )}
     </View>
   );
 }

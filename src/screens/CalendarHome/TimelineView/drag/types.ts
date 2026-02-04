@@ -1,6 +1,39 @@
 import type {SharedValue} from 'react-native-reanimated';
 import type {EventBlockLayout} from '../TimelineUtils';
 
+// ── Create Event (empty space long-press) ──
+
+export interface CreateDragState {
+  isCreating: boolean;
+  /** Anchor Y in content coordinates (center of initial block) */
+  anchorY: number;
+  /** Top Y in content coordinates (snapped) */
+  topY: number;
+  /** Bottom Y in content coordinates (snapped) */
+  bottomY: number;
+  /** Column index where creation started */
+  columnIndex: number;
+}
+
+export interface CreateDragSharedValues {
+  isCreating: SharedValue<boolean>;
+  /** Overlay top Y (content coordinates) */
+  overlayTopY: SharedValue<number>;
+  /** Overlay bottom Y (content coordinates) */
+  overlayBottomY: SharedValue<number>;
+  /** Overlay X position */
+  overlayX: SharedValue<number>;
+  /** Overlay width */
+  overlayWidth: SharedValue<number>;
+  overlayOpacity: SharedValue<number>;
+  /** Anchor Y - fixed center point from long press */
+  anchorY: SharedValue<number>;
+  /** Expected scroll offset (for auto-scroll sync) */
+  expectedScroll: SharedValue<number>;
+  /** Pan gesture active flag */
+  panActive: SharedValue<boolean>;
+}
+
 export interface DragState {
   isDragging: boolean;
   draggedEventId: string | null;

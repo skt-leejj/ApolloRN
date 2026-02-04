@@ -14,6 +14,9 @@ import {calculateEventBlockLayouts} from './TimelineUtils';
 import {useDragEvent} from './drag/useDragEvent';
 import {useAutoScroll} from './drag/useAutoScroll';
 import {DragOverlay} from './drag/DragOverlay';
+import {useCreateEvent} from './drag/useCreateEvent';
+import {useCreateAutoScroll} from './drag/useCreateAutoScroll';
+import {CreateOverlay} from './drag/CreateOverlay';
 
 interface TimelineViewProps {
   numberOfDays: 1 | 3 | 7;
@@ -69,7 +72,22 @@ export function TimelineView({
     onEventPress,
   });
 
-  // 자동 스크롤 훅
+  // 빈 공간 롱프레스 → 이벤트 생성 훅
+  const {
+    createSharedValues,
+    createGesture,
+    createScrollEnabled,
+  } = useCreateEvent({
+    numberOfDays,
+    days,
+    columnWidth,
+    scrollOffset,
+    onCreateEvent: (startDate, endDate) => {
+      console.log('[TimelineView] onCreateEvent', {startDate, endDate});
+    },
+  });
+
+  // 자동 스크롤 훅 (이벤트 드래그)
   useAutoScroll({
     scrollRef,
     isDragging: dragSharedValues.isDragging,
@@ -78,6 +96,18 @@ export function TimelineView({
     overlayHeight: dragSharedValues.overlayHeight,
     startContentY: dragSharedValues.startContentY,
     expectedScroll: dragSharedValues.expectedScroll,
+    scrollViewY,
+    scrollViewHeight,
+  });
+
+  // 자동 스크롤 훅 (이벤트 생성)
+  useCreateAutoScroll({
+    scrollRef,
+    isCreating: createSharedValues.isCreating,
+    panActive: createSharedValues.panActive,
+    overlayTopY: createSharedValues.overlayTopY,
+    overlayBottomY: createSharedValues.overlayBottomY,
+    expectedScroll: createSharedValues.expectedScroll,
     scrollViewY,
     scrollViewHeight,
   });
@@ -114,7 +144,7 @@ export function TimelineView({
       <Animated.ScrollView
         ref={scrollRef}
         style={styles.scrollView}
-        scrollEnabled={scrollEnabled}
+        scrollEnabled={scrollEnabled && createScrollEnabled}
         showsVerticalScrollIndicator={false}
         onScroll={scrollHandler}
         scrollEventThrottle={16}
@@ -127,6 +157,7 @@ export function TimelineView({
           gestureMap={gestureMap}
           draggedEventId={dragState.draggedEventId}
           onColumnWidthChange={handleColumnWidthChange}
+          createGesture={createGesture}
         />
       </Animated.ScrollView>
 
@@ -134,6 +165,12 @@ export function TimelineView({
       <DragOverlay
         draggedEvent={dragState.draggedEventId ? events.find(e => e.id === dragState.draggedEventId) ?? null : null}
         sharedValues={dragSharedValues}
+        scrollViewY={scrollViewY}
+      />
+
+      {/* 이벤트 생성 오버레이 */}
+      <CreateOverlay
+        sharedValues={createSharedValues}
         scrollViewY={scrollViewY}
       />
     </View>
