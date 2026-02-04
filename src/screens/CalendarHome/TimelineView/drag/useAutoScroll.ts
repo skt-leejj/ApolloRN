@@ -1,14 +1,13 @@
-import {useCallback} from 'react';
 import type {SharedValue} from 'react-native-reanimated';
 import {
   useSharedValue,
   useAnimatedReaction,
   useFrameCallback,
-  runOnJS,
+  scrollTo,
 } from 'react-native-reanimated';
 import type Animated from 'react-native-reanimated';
 import {LAYOUT} from '../../../../utils/colors';
-import {EDGE_THRESHOLD, SCROLL_SPEED} from './constants';
+import {EDGE_THRESHOLD, SCROLL_SPEED_PX_PER_SEC} from './constants';
 
 interface UseAutoScrollParams {
   scrollRef: React.RefObject<Animated.ScrollView>;
@@ -35,10 +34,6 @@ export function useAutoScroll({
 }: UseAutoScrollParams) {
   // 스크롤 방향: -1 = up, 0 = none, 1 = down
   const scrollDirection = useSharedValue(0);
-
-  const performScroll = useCallback((newOffset: number) => {
-    scrollRef.current?.scrollTo({y: newOffset, animated: false});
-  }, [scrollRef]);
 
   // UI thread에서 edge 감지 → scrollDirection 업데이트
   useAnimatedReaction(
@@ -70,18 +65,20 @@ export function useAutoScroll({
   );
 
   // UI thread frame callback으로 실제 스크롤 수행 (race condition 없음)
-  useFrameCallback(() => {
+  useFrameCallback((frame) => {
     'worklet';
     if (scrollDirection.value === 0) {return;}
 
     const currentOffset = expectedScroll.value;
     const maxScroll = 24 * LAYOUT.hourHeight - scrollViewHeight.value;
+    const dtMs = frame.timeSincePreviousFrame ?? 16.67;
+    const deltaStep = (SCROLL_SPEED_PX_PER_SEC * dtMs) / 1000;
     let newOffset: number;
 
     if (scrollDirection.value < 0) {
-      newOffset = Math.max(0, currentOffset - SCROLL_SPEED);
+      newOffset = Math.max(0, currentOffset - deltaStep);
     } else {
-      newOffset = Math.min(maxScroll, currentOffset + SCROLL_SPEED);
+      newOffset = Math.min(maxScroll, currentOffset + deltaStep);
     }
 
     if (newOffset === currentOffset) {return;}
@@ -102,6 +99,6 @@ export function useAutoScroll({
       Math.min(startContentY.value + delta, maxContentY),
     );
 
-    runOnJS(performScroll)(newOffset);
+    scrollTo(scrollRef, 0, newOffset, false);
   });
 }
