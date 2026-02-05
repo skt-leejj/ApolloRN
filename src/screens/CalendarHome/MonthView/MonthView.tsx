@@ -53,6 +53,7 @@ export function MonthView({selectedDate, events, onDayPress, onEventPress, navig
     generateInitialSections(selectedDate),
   );
   const isLoadingRef = useRef(false);
+  const isNavigatingRef = useRef(false);
 
   // 초기 스크롤 인덱스
   const initialIndex = INITIAL_RANGE;
@@ -62,12 +63,18 @@ export function MonthView({selectedDate, events, onDayPress, onEventPress, navig
     if (navigateToDateTrigger == null || navigateToDateTrigger === 0) {
       return;
     }
-    const newSections = generateInitialSections(selectedDate);
-    setSections(newSections);
-    setTimeout(() => {
-      flatListRef.current?.scrollToIndex({index: INITIAL_RANGE, animated: true});
-    }, 50);
+    isNavigatingRef.current = true;
+    setSections(generateInitialSections(selectedDate));
   }, [navigateToDateTrigger]); // selectedDate가 아닌 trigger에만 반응
+
+  // sections 변경 후 즉시 스냅 (네비게이션 중일 때만)
+  useEffect(() => {
+    if (!isNavigatingRef.current) {
+      return;
+    }
+    flatListRef.current?.scrollToIndex({index: INITIAL_RANGE, animated: false});
+    isNavigatingRef.current = false;
+  }, [sections]);
 
   // 뒤쪽에 월 추가 (아래로 스크롤)
   const handleEndReached = useCallback(() => {
@@ -106,6 +113,9 @@ export function MonthView({selectedDate, events, onDayPress, onEventPress, navig
   // 스크롤 위치 감시 → 상단 근접 시 앞쪽 데이터 추가
   const handleViewableItemsChanged = useCallback(
     ({viewableItems}: {viewableItems: Array<{index: number | null}>}) => {
+      if (isNavigatingRef.current) {
+        return;
+      }
       if (viewableItems.length === 0) {
         return;
       }

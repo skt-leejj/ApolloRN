@@ -21,7 +21,7 @@ export function CalendarHomeScreen() {
   const insets = useSafeAreaInsets();
   const {viewType, selectedDate, setSelectedDate, navigateToDate, navigateToDateTrigger} =
     useCalendarStore();
-  const {events} = useCalendarEvents();
+  const {events, loadMoreEvents} = useCalendarEvents();
   const [sideMenuVisible, setSideMenuVisible] = useState(false);
   const [monthPickerVisible, setMonthPickerVisible] = useState(false);
 
@@ -79,6 +79,7 @@ export function CalendarHomeScreen() {
           events={events}
           onEventPress={handleEventPress}
           navigateToDateTrigger={navigateToDateTrigger}
+          onLoadMoreEvents={loadMoreEvents}
         />
       );
     }

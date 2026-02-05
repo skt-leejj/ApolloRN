@@ -1,4 +1,4 @@
-import React, {useCallback, useEffect, useRef, useState} from 'react';
+import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import {
   View,
   StyleSheet,
@@ -10,13 +10,13 @@ import {
 import type {DailyComponentItem} from '../../../types/calendar';
 import {COLORS} from '../../../utils/colors';
 import {DateSection} from './DateSection';
-import {DailyCalendarBridge} from '../../../bridge/DailyCalendarBridge';
 
 interface ListViewProps {
   selectedDate: Date;
   events: DailyComponentItem[];
   onEventPress?: (eventId: string) => void;
   navigateToDateTrigger?: number;
+  onLoadMoreEvents?: (startDate: string, endDate: string) => Promise<void>;
 }
 
 interface DateSectionType {
@@ -28,106 +28,127 @@ interface DateSectionType {
 const DAYS_TO_LOAD = 30;
 const SCROLL_THRESHOLD = 2000;
 
+function getDateKey(date: Date) {
+  return date.toISOString().split('T')[0];
+}
+
+function buildEventsMap(events: DailyComponentItem[]) {
+  const map = new Map<string, DailyComponentItem[]>();
+  events.forEach(event => {
+    const eventDate = new Date(event.eventDetail.startDate.date);
+    const key = getDateKey(eventDate);
+    if (!map.has(key)) {
+      map.set(key, []);
+    }
+    map.get(key)!.push(event);
+  });
+  return map;
+}
+
+function buildSections(
+  centerDate: Date,
+  daysRange: number,
+  eventsMap: Map<string, DailyComponentItem[]>,
+): DateSectionType[] {
+  const center = new Date(centerDate);
+  center.setHours(0, 0, 0, 0);
+
+  const start = new Date(center);
+  start.setDate(start.getDate() - daysRange);
+
+  const end = new Date(center);
+  end.setDate(end.getDate() + daysRange);
+
+  const sections: DateSectionType[] = [];
+  const current = new Date(start);
+
+  while (current <= end) {
+    const dateKey = getDateKey(current);
+    sections.push({
+      date: new Date(current),
+      dateKey,
+      events: eventsMap.get(dateKey) || [],
+    });
+    current.setDate(current.getDate() + 1);
+  }
+
+  return sections;
+}
+
 export function ListView({
   selectedDate,
   events,
   onEventPress,
   navigateToDateTrigger,
+  onLoadMoreEvents,
 }: ListViewProps) {
-  const [dateSections, setDateSections] = useState<DateSectionType[]>([]);
-  const [loadingMore, setLoadingMore] = useState(false);
-  const [initialScrollIndex, setInitialScrollIndex] = useState<number>(0);
   const flatListRef = useRef<FlatList>(null);
   const startDateRef = useRef<Date>(new Date());
   const endDateRef = useRef<Date>(new Date());
   const isLoadingRef = useRef(false);
-  const hasInitializedRef = useRef(false);
-  const allEventsRef = useRef<Map<string, DailyComponentItem[]>>(new Map());
-  const dateSectionsRef = useRef<DateSectionType[]>([]);
+  const [loadingMore, setLoadingMore] = useState(false);
 
-  const getDateKey = (date: Date) => {
-    return date.toISOString().split('T')[0];
-  };
+  // events props → Map으로 변환
+  const eventsMap = useMemo(() => buildEventsMap(events), [events]);
 
-  const initializeDateRange = useCallback(() => {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+  // 날짜 섹션 생성 (centerDate 기준)
+  const [centerDate, setCenterDate] = useState(() => new Date());
+  const [dateSections, setDateSections] = useState<DateSectionType[]>([]);
+  const [initialScrollIndex, setInitialScrollIndex] = useState(0);
 
-    const start = new Date(today);
-    start.setDate(start.getDate() - DAYS_TO_LOAD);
-
-    const end = new Date(today);
-    end.setDate(end.getDate() + DAYS_TO_LOAD);
-
-    startDateRef.current = start;
-    endDateRef.current = end;
-
-    const sections: DateSectionType[] = [];
-    const current = new Date(start);
-
-    while (current <= end) {
-      const dateKey = getDateKey(current);
-      sections.push({
-        date: new Date(current),
-        dateKey,
-        events: allEventsRef.current.get(dateKey) || [],
-      });
-      current.setDate(current.getDate() + 1);
-    }
-
-    return sections;
-  }, []);
-
-  // 초기 데이터 로드
+  // centerDate 변경 시 섹션 재생성
   useEffect(() => {
-    if (hasInitializedRef.current) return;
-    hasInitializedRef.current = true;
+    const sections = buildSections(centerDate, DAYS_TO_LOAD, eventsMap);
 
-    // props로 받은 events를 맵으로 변환
-    const eventsMap = new Map<string, DailyComponentItem[]>();
-    events.forEach(event => {
-      const eventDate = new Date(event.eventDetail.startDate.date);
-      const key = getDateKey(eventDate);
-      if (!eventsMap.has(key)) {
-        eventsMap.set(key, []);
-      }
-      eventsMap.get(key)!.push(event);
-    });
+    const center = new Date(centerDate);
+    center.setHours(0, 0, 0, 0);
 
-    allEventsRef.current = eventsMap;
+    startDateRef.current = new Date(center);
+    startDateRef.current.setDate(startDateRef.current.getDate() - DAYS_TO_LOAD);
+    endDateRef.current = new Date(center);
+    endDateRef.current.setDate(endDateRef.current.getDate() + DAYS_TO_LOAD);
 
-    const sections = initializeDateRange();
-
-    // 오늘 인덱스 찾기
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const todayIndex = sections.findIndex(section => {
-      return getDateKey(section.date) === getDateKey(today);
-    });
-
-    if (todayIndex !== -1) {
-      setInitialScrollIndex(todayIndex);
-    }
+    // 중심 날짜의 인덱스
+    const centerKey = getDateKey(center);
+    const centerIndex = sections.findIndex(s => s.dateKey === centerKey);
 
     setDateSections(sections);
-    dateSectionsRef.current = sections;
-  }, [initializeDateRange, events]);
+    if (centerIndex !== -1) {
+      setInitialScrollIndex(centerIndex);
+    }
+  }, [centerDate]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // eventsMap 변경 시 기존 섹션의 이벤트 동기화
+  useEffect(() => {
+    setDateSections(prev =>
+      prev.map(section => ({
+        ...section,
+        events: eventsMap.get(section.dateKey) || [],
+      })),
+    );
+  }, [eventsMap]);
 
   // 외부 날짜 이동 요청 (오늘 버튼, MonthPickerPopup 등)
   useEffect(() => {
     if (navigateToDateTrigger == null || navigateToDateTrigger === 0) {
       return;
     }
-    // selectedDate 기준으로 해당 날짜 섹션으로 스크롤
-    const targetKey = getDateKey(selectedDate);
-    const targetIndex = dateSectionsRef.current.findIndex(
-      section => getDateKey(section.date) === targetKey,
-    );
-    if (targetIndex !== -1) {
-      flatListRef.current?.scrollToIndex({index: targetIndex, animated: true});
-    }
-  }, [navigateToDateTrigger]); // selectedDate가 아닌 trigger에만 반응
+    setCenterDate(new Date(selectedDate));
 
+    // 스크롤 이동은 다음 렌더 후
+    const targetDate = new Date(selectedDate);
+    targetDate.setHours(0, 0, 0, 0);
+    setTimeout(() => {
+      const targetKey = getDateKey(targetDate);
+      const sections = buildSections(targetDate, DAYS_TO_LOAD, eventsMap);
+      const targetIndex = sections.findIndex(s => s.dateKey === targetKey);
+      if (targetIndex !== -1) {
+        flatListRef.current?.scrollToIndex({index: targetIndex, animated: false});
+      }
+    }, 0);
+  }, [navigateToDateTrigger]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // 스크롤 확장 시 날짜 섹션 추가 + 이벤트 로드 요청
   const loadMoreDays = useCallback(
     async (direction: 'past' | 'future') => {
       if (isLoadingRef.current) return;
@@ -135,88 +156,67 @@ export function ListView({
       setLoadingMore(true);
 
       try {
-        const sections: DateSectionType[] = [];
-        let loadStartDate: Date;
-        let loadEndDate: Date;
+        const newSections: DateSectionType[] = [];
+        let loadStartDate: string;
+        let loadEndDate: string;
 
         if (direction === 'past') {
-          const start = new Date(startDateRef.current);
-          start.setDate(start.getDate() - DAYS_TO_LOAD);
-          loadStartDate = start;
-          loadEndDate = new Date(startDateRef.current);
-          loadEndDate.setDate(loadEndDate.getDate() - 1);
+          const newStart = new Date(startDateRef.current);
+          newStart.setDate(newStart.getDate() - DAYS_TO_LOAD);
 
-          const current = new Date(start);
+          const current = new Date(newStart);
           while (current < startDateRef.current) {
             const dateKey = getDateKey(current);
-            sections.push({
+            newSections.push({
               date: new Date(current),
               dateKey,
-              events: allEventsRef.current.get(dateKey) || [],
+              events: eventsMap.get(dateKey) || [],
             });
             current.setDate(current.getDate() + 1);
           }
 
-          startDateRef.current = start;
+          loadStartDate = getDateKey(newStart);
+          const prevDay = new Date(startDateRef.current);
+          prevDay.setDate(prevDay.getDate() - 1);
+          loadEndDate = getDateKey(prevDay);
+
+          startDateRef.current = newStart;
         } else {
-          const end = new Date(endDateRef.current);
-          end.setDate(end.getDate() + DAYS_TO_LOAD);
-          loadStartDate = new Date(endDateRef.current);
-          loadStartDate.setDate(loadStartDate.getDate() + 1);
-          loadEndDate = end;
+          const newEnd = new Date(endDateRef.current);
+          newEnd.setDate(newEnd.getDate() + DAYS_TO_LOAD);
 
           const current = new Date(endDateRef.current);
           current.setDate(current.getDate() + 1);
 
-          while (current <= end) {
+          while (current <= newEnd) {
             const dateKey = getDateKey(current);
-            sections.push({
+            newSections.push({
               date: new Date(current),
               dateKey,
-              events: allEventsRef.current.get(dateKey) || [],
+              events: eventsMap.get(dateKey) || [],
             });
             current.setDate(current.getDate() + 1);
           }
 
-          endDateRef.current = end;
+          const nextDay = new Date(endDateRef.current);
+          nextDay.setDate(nextDay.getDate() + 1);
+          loadStartDate = getDateKey(nextDay);
+          loadEndDate = getDateKey(newEnd);
+
+          endDateRef.current = newEnd;
         }
 
-        // 새로운 날짜 범위의 이벤트 로드
-        const startDateString = loadStartDate.toISOString().split('T')[0];
-        const endDateString = loadEndDate.toISOString().split('T')[0];
-        const newEvents = await DailyCalendarBridge.getEvents(
-          startDateString,
-          endDateString,
+        // store를 통해 이벤트 로드 요청
+        if (onLoadMoreEvents) {
+          await onLoadMoreEvents(loadStartDate, loadEndDate);
+        }
+
+        // 섹션 추가
+        setDateSections(prev =>
+          direction === 'past'
+            ? [...newSections, ...prev]
+            : [...prev, ...newSections],
         );
-
-        // 새로운 이벤트를 ref에 추가
-        newEvents.forEach(event => {
-          const eventDate = new Date(event.eventDetail.startDate.date);
-          const key = getDateKey(eventDate);
-          if (!allEventsRef.current.has(key)) {
-            allEventsRef.current.set(key, []);
-          }
-          const existing = allEventsRef.current.get(key)!;
-          // 중복 체크
-          if (!existing.find(e => e.id === event.id)) {
-            existing.push(event);
-          }
-        });
-
-        // 새로 추가된 섹션에 이벤트 할당
-        sections.forEach(section => {
-          section.events = allEventsRef.current.get(section.dateKey) || [];
-        });
-
-        // 섹션 추가 (기존 섹션은 참조 유지)
-        setDateSections(prev => {
-          const newSections =
-            direction === 'past'
-              ? [...sections, ...prev]
-              : [...prev, ...sections];
-          dateSectionsRef.current = newSections;
-          return newSections;
-        });
       } catch (error) {
         console.error('Failed to load more days:', error);
       } finally {
@@ -224,19 +224,17 @@ export function ListView({
         setLoadingMore(false);
       }
     },
-    [],
+    [eventsMap, onLoadMoreEvents],
   );
 
   const handleScroll = useCallback(
     (event: NativeSyntheticEvent<NativeScrollEvent>) => {
       const {contentOffset, contentSize, layoutMeasurement} = event.nativeEvent;
 
-      // 상단 근처에서 과거 데이터 로드
       if (contentOffset.y < SCROLL_THRESHOLD) {
         loadMoreDays('past');
       }
 
-      // 하단 근처에서 미래 데이터 로드
       if (
         contentOffset.y + layoutMeasurement.height >
         contentSize.height - SCROLL_THRESHOLD
@@ -274,7 +272,6 @@ export function ListView({
         onScroll={handleScroll}
         scrollEventThrottle={400}
         onScrollToIndexFailed={info => {
-          // 스크롤 실패 시 재시도
           setTimeout(() => {
             if (
               flatListRef.current &&

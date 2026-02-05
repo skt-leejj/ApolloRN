@@ -99,9 +99,11 @@ export function TimelinePager({
   );
   const isLoadingRef = useRef(false);
   const currentIndexRef = useRef(INITIAL_PAGES);
+  const isNavigatingRef = useRef(false);
 
   // numberOfDays 변경 시 페이지 재생성
   useEffect(() => {
+    isNavigatingRef.current = true;
     setPages(generateInitialPages(selectedDate, numberOfDays));
     currentIndexRef.current = INITIAL_PAGES;
   }, [numberOfDays]);
@@ -111,11 +113,19 @@ export function TimelinePager({
     if (navigateToDateTrigger == null || navigateToDateTrigger === 0) {
       return;
     }
+    isNavigatingRef.current = true;
     setPages(generateInitialPages(selectedDate, numberOfDays));
-    setTimeout(() => {
-      flatListRef.current?.scrollToIndex({index: INITIAL_PAGES, animated: true});
-    }, 50);
+    currentIndexRef.current = INITIAL_PAGES;
   }, [navigateToDateTrigger]); // selectedDate가 아닌 trigger에만 반응
+
+  // pages 변경 후 즉시 스냅 (네비게이션 중일 때만)
+  useEffect(() => {
+    if (!isNavigatingRef.current) {
+      return;
+    }
+    flatListRef.current?.scrollToIndex({index: INITIAL_PAGES, animated: false});
+    isNavigatingRef.current = false;
+  }, [pages]);
 
   // 뒤쪽에 페이지 추가
   const handleEndReached = useCallback(() => {
@@ -158,6 +168,9 @@ export function TimelinePager({
   // 스크롤 위치 감시 → 상단 근접 시 앞쪽 데이터 추가
   const handleViewableItemsChanged = useCallback(
     ({viewableItems}: {viewableItems: Array<{index: number | null; item: TimelinePage}>}) => {
+      if (isNavigatingRef.current) {
+        return;
+      }
       if (viewableItems.length === 0) {
         return;
       }

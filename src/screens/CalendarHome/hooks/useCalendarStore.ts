@@ -15,6 +15,7 @@ interface CalendarHomeState {
   navigateToDate: (date: Date) => void;
   goToToday: () => void;
   setEvents: (events: DailyComponentItem[]) => void;
+  appendEvents: (events: DailyComponentItem[]) => void;
   setCalendars: (calendars: CalendarItem[]) => void;
   setLoading: (loading: boolean) => void;
 }
@@ -40,6 +41,12 @@ export const useCalendarStore = create<CalendarHomeState>(set => ({
       navigateToDateTrigger: state.navigateToDateTrigger + 1,
     })),
   setEvents: events => set({events}),
+  appendEvents: newEvents =>
+    set(state => {
+      const existingIds = new Set(state.events.map(e => e.id));
+      const unique = newEvents.filter(e => !existingIds.has(e.id));
+      return {events: [...state.events, ...unique]};
+    }),
   setCalendars: calendars => set({calendars}),
   setLoading: loading => set({loading}),
 }));

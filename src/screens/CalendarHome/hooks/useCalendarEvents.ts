@@ -20,6 +20,7 @@ export function useCalendarEvents() {
     calendars,
     loading,
     setEvents,
+    appendEvents,
     setCalendars,
     setLoading,
   } = useCalendarStore();
@@ -36,6 +37,11 @@ export function useCalendarEvents() {
           const monthEnd = endOfMonth(addMonths(selectedDate, 2));
           start = startOfWeek(monthStart, {weekStartsOn: 0});
           end = endOfWeek(monthEnd, {weekStartsOn: 0});
+          break;
+        }
+        case 'list': {
+          start = addDays(selectedDate, -30);
+          end = addDays(selectedDate, 30);
           break;
         }
         case 'week': {
@@ -84,5 +90,20 @@ export function useCalendarEvents() {
     loadCalendars();
   }, [loadCalendars]);
 
-  return {events, calendars, loading, refreshEvents: loadEvents};
+  const loadMoreEvents = useCallback(
+    async (startDate: string, endDate: string) => {
+      try {
+        const newEvents = await DailyCalendarBridge.getEvents(
+          startDate,
+          endDate,
+        );
+        appendEvents(newEvents);
+      } catch (_e) {
+        // 에러 시 무시
+      }
+    },
+    [appendEvents],
+  );
+
+  return {events, calendars, loading, refreshEvents: loadEvents, loadMoreEvents};
 }

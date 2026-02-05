@@ -106,7 +106,7 @@ export function MonthPickerPopup({
         }),
       ]).start(() => setShouldRender(false));
     }
-  }, [visible, slideAnim, overlayOpacity, selectedDate]);
+  }, [visible, slideAnim, overlayOpacity]);
 
   const goToPrevMonth = useCallback(() => {
     const newIndex = currentIndexRef.current - 1;
